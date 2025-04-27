@@ -1,67 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Micro:bit Control</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        button { padding: 10px 20px; margin: 5px; font-size: 16px; }
-        #slider { width: 200px; }
-        #status { font-size: 18px; margin-top: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Micro:bit Servo Control</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
+    button {
+      font-size: 24px;
+      margin: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    .arrow-button {
+      font-size: 40px;
+      width: 80px;
+      height: 80px;
+      margin: 5px;
+    }
+    #status {
+      margin: 20px;
+      font-size: 20px;
+      color: green;
+    }
+  </style>
 </head>
 <body>
-    <h1>Micro:bit Controller</h1>
-    <button id="connect">Bluetooth 연결</button>
-    <div id="status">연결되지 않음</div>
+
+  <h1>Micro:bit Servo Control</h1>
+
+  <button onclick="connect()">Connect to micro:bit</button>
+
+  <div id="status">🔴 Not connected</div>
+
+  <div id="controls">
+    <p>Use arrow keys or click the buttons to control!</p>
+
     <div>
-        <button onclick="sendCommand('up')">↑ Up</button><br>
-        <button onclick="sendCommand('left')">← Left</button>
-        <button onclick="sendCommand('stop')">■ Stop</button>
-        <button onclick="sendCommand('right')">→ Right</button><br>
-        <button onclick="sendCommand('down')">↓ Down</button>
+      <button class="arrow-button" onclick="sendCommand('up')">⬆️</button>
     </div>
-    <button onclick="sendCommand('horn')">🔊 경적</button>
-    <br>
-    <input type="range" id="slider" min="0" max="180" oninput="updateSlider()">
-    <div>Slider Value: <span id="sliderValue">90</span></div>
+    <div>
+      <button class="arrow-button" onclick="sendCommand('left')">⬅️</button>
+      <button class="arrow-button" onclick="sendCommand('down')">⬇️</button>
+      <button class="arrow-button" onclick="sendCommand('right')">➡️</button>
+    </div>
+  </div>
 
-    <script>
-        let bluetoothDevice;
-        let uartCharacteristic;
+<script>
+let device;
+let uartService;
+let txCharacteristic;
+let rxCharacteristic;
 
-        document.getElementById('connect').addEventListener('click', async () => {
-            try {
-                bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] // UART 서비스 UUID
-                });
-                const server = await bluetoothDevice.gatt.connect();
-                const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-                uartCharacteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e'); // TX characteristic
-                document.getElementById('status').innerText = '연결됨';
-            } catch (error) {
-                document.getElementById('status').innerText = '연결 실패';
-                console.error(error);
-            }
-        });
+async function connect() {
+  try {
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'BBC micro:bit' }],
+      optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+    });
 
-        function sendCommand(command) {
-            if (!uartCharacteristic) {
-                alert('먼저 Bluetooth 연결 버튼을 클릭하세요.');
-                return;
-            }
-            const encoder = new TextEncoder();
-            uartCharacteristic.writeValue(encoder.encode(command));
-            console.log('Sent command:', command); // 디버깅용 로그 출력
-        }
+    const server = await device.gatt.connect();
+    uartService = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+    txCharacteristic = await uartService.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+    rxCharacteristic = await uartService.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
 
-        function updateSlider() {
-            const value = document.getElementById('slider').value;
-            document.getElementById('sliderValue').innerText = value;
-            sendCommand('x' + value);
-        }
-    </script>
+    window.addEventListener('keydown', handleKey);
+
+    document.getElementById('status').textContent = '✅ Connected to micro:bit!';
+    console.log('Connected!');
+  } catch (error) {
+    console.error(error);
+    document.getElementById('status').textContent = '❌ Connection failed!';
+  }
+}
+
+async function handleKey(event) {
+  if (!txCharacteristic) return;
+
+  let command = '';
+
+  switch (event.key) {
+    case 'ArrowUp':
+      command = 'up';
+      break;
+    case 'ArrowDown':
+      command = 'down';
+      break;
+    case 'ArrowLeft':
+      command = 'left';
+      break;
+    case 'ArrowRight':
+      command = 'right';
+      break;
+    default:
+      return;
+  }
+
+  sendCommand(command);
+}
+
+async function sendCommand(command) {
+  if (!txCharacteristic) {
+    alert('Please connect to micro:bit first!');
+    return;
+  }
+  try {
+    const encoder = new TextEncoder();
+    await txCharacteristic.writeValue(encoder.encode(command + '\n')); // <-- 중요: \n 추가!!
+    console.log('Sent:', command);
+  } catch (error) {
+    console.error('Send failed', error);
+  }
+}
+</script>
+
 </body>
 </html>
