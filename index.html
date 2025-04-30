@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Microbit BLE Control</title>
+  <style>
+    body { font-family: sans-serif; background: #222; color: white; text-align: center; padding: 2em; }
+    button { margin: 0.5em; padding: 1em 2em; font-size: 1em; border-radius: 10px; background: #555; color: white; }
+    input[type=range] { width: 80%; margin: 1em 0; }
+  </style>
+</head>
+<body>
+
+<h1>Micro:bit Bluetooth Control</h1>
+<button onclick="connect()">🔌 Connect</button>
+
+<div>
+  <h3>Direction</h3>
+  <button onmousedown="send('up')" onmouseup="send('stop')" ontouchstart="send('up')" ontouchend="send('stop')">⬆️ Up</button><br>
+  <button onmousedown="send('left')" onmouseup="send('stop')" ontouchstart="send('left')" ontouchend="send('stop')">⬅️ Left</button>
+  <button onmousedown="send('horn')" onmouseup="send('stop')" ontouchstart="send('horn')" ontouchend="send('stop')">🔔 Horn</button>
+  <button onmousedown="send('right')" onmouseup="send('stop')" ontouchstart="send('right')" ontouchend="send('stop')">➡️ Right</button><br>
+  <button onmousedown="send('down')" onmouseup="send('stop')" ontouchstart="send('down')" ontouchend="send('stop')">⬇️ Down</button>
+</div>
+
+<div>
+  <label for="slider1">Slider 1 ("c")</label><br>
+  <input type="range" id="slider1" min="0" max="180" value="90" oninput="send('c' + this.value)">
+</div>
+
+<div>
+  <label for="slider2">Slider 2 ("x")</label><br>
+  <input type="range" id="slider2" min="0" max="180" value="90" oninput="send('x' + this.value)">
+</div>
+
+<script>
+  let device, uartService, uartTX;
+
+  async function connect() {
+    try {
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: 'BBC micro:bit' }],
+        optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+      });
+      const server = await device.gatt.connect();
+      uartService = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+      uartTX = await uartService.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+      alert("Connected to micro:bit!");
+    } catch (error) {
+      alert("Connection failed: " + error);
+    }
+  }
+
+function send(message) {
+  if (!uartTX) {
+    alert("Not connected");
+    return;
+  }
+  const encoder = new TextEncoder();
+  uartTX.writeValue(encoder.encode(message + "\r\n"));  // ← 여기 \r\n 이 중요합니다
+  console.log("Sent:", message);
+}
+  
+  
+</script>
+
+</body>
+</html>
